@@ -1,0 +1,100 @@
+openapi: 3.0.0
+info:
+  description: This api is dedidacted to train neural network using PPDG where the actor is a PID
+  version: 1.0.0
+  title: API Documentation - Smart PID
+
+paths:
+  /agent/remember:
+    post:
+      description: Store data into buffer memory
+      operationId: api.agent.remember
+      tags:
+        - Agent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+               $ref: '#/components/schemas/MemoryData'
+      responses:
+        "200":
+          description: Successfully remembered data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemoryData'
+  /settings/buffer:
+    post:
+      description: Configure agent settings
+      operationId: api.settings.set_buffer
+      tags:
+        - Settings
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BufferSettings'
+        required: true
+
+      responses:
+        "200":
+          description: Successfully saved agent settings
+          content:
+            application/json:
+              schema:
+                  $ref: '#/components/schemas/BufferSettings'
+  /buffer/reset:
+    post:
+      description: Erase all data from buffer memory
+      operationId: api.buffer.reset
+      tags:
+        - Buffer
+      responses:
+        "200":
+          description: Buffer memory was sucessfully deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Response'
+
+servers:
+  - url: /api
+
+components:
+  schemas:
+    BufferSettings:
+      type: object
+      properties:
+        mem_size:
+          description: agent memory max size
+          type: integer
+          example: 100000
+        mem_index:
+          description: agent memory index
+          type: integer
+    MemoryData:
+      type: array
+      items:
+        type: array
+        items:
+          type: number
+          format: double
+          minLength: 10
+          maxLength: 10
+        minLength: 1
+    Response:
+      type: object
+      properties:
+        status:
+          type: string
+        message:
+          type: string
+    MemoryStorageResponse:
+      $ref: '#/components/schemas/Response'
+      properties:
+        values:
+          $ref: '#/components/schemas/MemoryData'
+
+
+
