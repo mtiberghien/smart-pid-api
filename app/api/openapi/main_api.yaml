@@ -8,7 +8,7 @@ paths:
   /agent/remember:
     post:
       description: Store data into buffer memory
-      operationId: api.agent.remember
+      operationId: app.api.agent.remember
       tags:
         - Agent
       requestBody:
@@ -23,11 +23,104 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/MemoryData'
-  /settings/buffer:
+                $ref: '#/components/schemas/MemoryStorageResponse'
+  /agent/learn:
+    get:
+      description: Learn from buffer memory and return PID updated weights
+      operationId: app.api.agent.learn
+      tags:
+        - Agent
+      responses:
+        "200":
+          description: Return the trained PID weights
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LearnResponse'
+        "400":
+          description: There is no experience in buffer memory
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Response'
+  /agent/weights:
+    get:
+      description: Get Actor Weights
+      operationId: app.api.agent.get_weights
+      tags:
+        - Agent
+      responses:
+        "200":
+          description: Agent actor weights
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LearnWeights'
     post:
-      description: Configure agent settings
-      operationId: api.settings.set_buffer
+      description: Set Actor Weights
+      operationId: app.api.agent.set_weights
+      tags:
+        - Agent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LearnWeights'
+      responses:
+        "200":
+          description: PID updated weights
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LearnResponse'
+  /agent/settings:
+    get:
+      description: Get Agent Settings
+      operationId: app.api.agent.get_settings
+      tags:
+        - Agent
+      responses:
+        "200":
+          description: Agent settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentSettings'
+    post:
+      description: Set Agent Settings
+      operationId: app.api.agent.set_settings
+      tags:
+        - Agent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentSettings'
+      responses:
+        "200":
+          description: Updated Agent Settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentSettingsResponse'
+  /settings/buffer:
+    get:
+      description: buffer memory settings
+      operationId: app.api.settings.get_buffer
+      tags:
+        - Settings
+      responses:
+        "200":
+          description: The buffer memory settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BufferSettings'
+    post:
+      description: Configure buffer memory settings
+      operationId: app.api.settings.set_buffer
       tags:
         - Settings
       requestBody:
@@ -39,7 +132,7 @@ paths:
 
       responses:
         "200":
-          description: Successfully saved agent settings
+          description: Successfully saved buffer memory settings
           content:
             application/json:
               schema:
@@ -47,7 +140,7 @@ paths:
   /buffer/reset:
     post:
       description: Erase all data from buffer memory
-      operationId: api.buffer.reset
+      operationId: app.api.buffer.reset
       tags:
         - Buffer
       responses:
@@ -57,6 +150,24 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Response'
+  /buffer/sample:
+    get:
+      tags:
+        - Buffer
+      description: Get a random sample from buffer memory
+      operationId: app.api.buffer.get_sample
+      parameters:
+        - in: query
+          name: batch_size
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Sample was successfully created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Sample'
 
 servers:
   - url: /api
@@ -73,21 +184,34 @@ components:
         mem_index:
           description: agent memory index
           type: integer
+          minimum: 1
+          example: 1
     MemoryData:
       type: array
+      minLength: 1
       items:
         type: array
         items:
           type: number
           format: double
-          minLength: 10
-          maxLength: 10
-        minLength: 1
+        minLength: 11
+        maxLength: 1
+        example: [1,2,3,4,5,6,7,8,9,10,0]
+      example: [[1,2,3,4,5,6,7,8,9,10,0],[11,12,13,14,15,16,17,18,19,20,1]]
+    LearnWeights:
+      type: array
+      minLength: 4
+      maxLength: 4
+      items:
+        type: number
+        format: double
+      example:  [1.,2.,3.,4]
     Response:
       type: object
       properties:
         status:
           type: string
+          example: ok
         message:
           type: string
     MemoryStorageResponse:
@@ -95,6 +219,66 @@ components:
       properties:
         values:
           $ref: '#/components/schemas/MemoryData'
+    LearnResponse:
+      $ref: '#/components/schemas/Response'
+      properties:
+        values:
+          $ref: '#/components/schemas/LearnWeights'
+    AgentSettings:
+      type: object
+      properties:
+        min_action:
+          type: number
+          format: double
+          example: -5.0
+        max_action:
+          type: number
+          format: double
+          example: 5.0
+      required:
+        - min_action
+        - max_action
+    AgentSettingsResponse:
+      $ref: '#/components/schemas/Response'
+      properties:
+        values:
+          $ref: '#/components/schemas/AgentSettings'
+    State:
+      type: array
+      items:
+        type: number
+        format: double
+      minLength: 4
+      maxLength: 4
+      example: [1,2,3,4]
+    Sample:
+      type: object
+      properties:
+        states:
+          type: array
+          items:
+            $ref: '#/components/schemas/State'
+        actions:
+          type: array
+          items:
+            type: number
+            format: double
+        rewards:
+          type: array
+          items:
+            type: number
+            format: double
+        new_states:
+          type: array
+          items:
+            $ref: '#/components/schemas/State'
+        are_done:
+            type: array
+            items:
+              type: integer
+
+
+
 
 
 

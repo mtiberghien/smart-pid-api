@@ -1,10 +1,9 @@
-from os import path
+from os import path, getcwd
+from app.model.settings import data_dir
 import sqlite3
 import numpy as np
-from app.model.response import BufferStorageResponse, Response
 
-
-buffer_db_path = "data/buffer_memory.db"
+buffer_db_path = path.join(data_dir, "buffer_memory.db")
 
 
 class BufferSettings:
@@ -21,7 +20,6 @@ class Buffer:
         con = sqlite3.connect(buffer_db_path)
         cursor = con.cursor()
         max_row = get_buffer_max_row(cursor)
-        print('mem_index:{}, max_row:{}'.format(self.settings.mem_index, max_row))
         for d in data:
             if self.settings.mem_index > max_row:
                 query = 'INSERT INTO "Data" (error, integral, derivative, saturatedIntegral, n_error, n_integral, \
@@ -30,16 +28,14 @@ class Buffer:
                 max_row += 1
             else:
                 query = 'UPDATE "Data" SET error = {}, integral = {}, derivative = {}, saturatedIntegral = {},\
-                        n_error = {}, n_derivative = {}, n_saturatedIntegral = {}, "action" = {}, reward = {},\
-                        done = {} WHERE id = {};'.format(d[0], d[1], d[2], d[3], d[4], d[5], d[6], d[7], d[8], d[9],
-                                                         self.settings.mem_index)
-            print(query)
+                        n_error = {}, n_integral = {}, n_derivative = {}, n_saturatedIntegral = {}, "action" = {},' \
+                        ' reward = {}, done = {} WHERE id = {};'.format(d[0], d[1], d[2], d[3], d[4], d[5], d[6], d[7],
+                                                                        d[8], d[9], d[10], self.settings.mem_index)
             cursor.execute(query)
-            self.settings.mem_index = max(1, (self.settings.mem_index+1) % (self.settings.mem_size + 1))
+            self.settings.mem_index = max(1, (self.settings.mem_index + 1) % (self.settings.mem_size + 1))
         con.commit()
         con.close()
         save_buffer_settings(mem_index=self.settings.mem_index)
-        return BufferStorageResponse("updated buffer memory", data).__dict__
 
 
 def reset_buffer():
@@ -49,12 +45,18 @@ def reset_buffer():
     cursor.execute('DELETE FROM SQLITE_SEQUENCE WHERE name = "Data"')
     con.commit()
     save_buffer_settings(mem_index=1)
-    return Response("memory buffer data was deleted").__dict__
 
 
 def get_buffer_max_row(cursor):
     result = cursor.execute('SELECT seq FROM SQLITE_SEQUENCE WHERE name = "Data"').fetchone()
     return 0 if result is None else result[0]
+
+
+def get_buffer_used_size():
+    con = sqlite3.connect(buffer_db_path)
+    cursor = con.cursor()
+    return get_buffer_max_row(cursor)
+    con.close()
 
 
 def get_buffer_sample(batch_size):
@@ -70,12 +72,19 @@ def get_buffer_sample(batch_size):
     data = np.array(cursor.execute(query).fetchall())
     rng.shuffle(data)
     con.close()
-    states = data[:, 0:4]
-    new_states = data[:, 4:8]
-    actions = np.squeeze(data[:, 8:9])
-    rewards = np.squeeze(data[:, 9:10])
-    are_done = np.squeeze(data[:, 10:11])
-    return states, actions, rewards, new_states, are_done
+    if data.size > 0:
+        states = data[:, 0:4]
+        new_states = data[:, 4:8]
+        actions = data[:, 8:9]
+        rewards = data[:, 9:10]
+        are_done = data[:, 10:11]
+    else:
+        states = np.array([])
+        actions = np.array([])
+        rewards = np.array([])
+        new_states = np.array([])
+        are_done = np.array([])
+    return batch_size, states, actions, rewards, new_states, are_done
 
 
 def save_buffer_settings(**kwargs):

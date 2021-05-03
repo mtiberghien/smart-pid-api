@@ -1,10 +1,10 @@
 class Response:
-    def __init__(self,message, status = "ok"):
+    def __init__(self, message, status="ok"):
         self.status = status
         self.message = message
 
 
-class BufferStorageResponse(Response):
+class ValuedResponse(Response):
     def __init__(self, message, value, status="ok"):
         super().__init__(message, status)
         self.value = value
