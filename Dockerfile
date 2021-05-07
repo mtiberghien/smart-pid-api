@@ -15,4 +15,4 @@ WORKDIR /usr/src/
 EXPOSE 1975
 
 ENTRYPOINT [ "gunicorn" ]
-CMD ["-w", "2", "-b", "0.0.0.0:1975", "app.wsgi"]
+CMD ["-w", "4","--access-logfile", "'-'","-b", "0.0.0.0:1975", "app.wsgi"]

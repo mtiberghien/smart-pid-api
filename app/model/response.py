@@ -6,5 +6,11 @@ class Response:
 
 class ValuedResponse(Response):
     def __init__(self, message, value, status="ok"):
-        super().__init__(message, status)
+        super(ValuedResponse, self).__init__(message, status)
         self.value = value
+
+
+class ExceptionResponse(Response):
+    def __init__(self, exception: Exception):
+        super(ExceptionResponse, self).__init__(str(exception), status="Exception of type {}"
+                                                .format(exception.__class__))

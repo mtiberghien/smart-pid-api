@@ -23,7 +23,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/MemoryStorageResponse'
+                $ref: '#/components/schemas/Response'
+        "500":
+          $ref: '#/components/responses/500-Execution'
   /agent/learn:
     get:
       description: Learn from buffer memory and return PID updated weights
@@ -36,13 +38,15 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/LearnResponse'
+                $ref: '#/components/schemas/ActorWeights'
         "400":
           description: There is no experience in buffer memory
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Response'
+        "500":
+          $ref: '#/components/responses/500-Execution'
   /agent/weights:
     get:
       description: Get Actor Weights
@@ -55,7 +59,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/LearnWeights'
+                $ref: '#/components/schemas/ActorWeights'
     post:
       description: Set Actor Weights
       operationId: app.api.agent.set_weights
@@ -66,14 +70,16 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/LearnWeights'
+              $ref: '#/components/schemas/ActorWeights'
       responses:
         "200":
           description: PID updated weights
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/LearnResponse'
+                $ref: '#/components/schemas/ActorWeightsResponse'
+        "500":
+          $ref: '#/components/responses/500-Execution'
   /agent/settings:
     get:
       description: Get Agent Settings
@@ -105,12 +111,66 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AgentSettingsResponse'
-  /settings/buffer:
+  /agent/actor/test:
+    post:
+      description: get result agent actor
+      operationId: app.api.agent.test_actor
+      tags:
+        - Test
+        - Agent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ActorInput'
+      responses:
+        "200":
+          description: The neural network PID action related to input state
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: array
+                  items:
+                    type: number
+                    format: double
+        "500":
+          $ref: '#/components/responses/500-Execution'
+  /agent/critic/test:
+    post:
+      description: get result agent actor
+      operationId: app.api.agent.test_critic
+      tags:
+        - Test
+        - Agent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CriticInput'
+      responses:
+        "200":
+          description: The neural network critic action related to input state and pid action
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: array
+                  items:
+                    type: number
+                    format: double
+        "500":
+          $ref: '#/components/responses/500-Execution'
+  /buffer/settings:
     get:
       description: buffer memory settings
-      operationId: app.api.settings.get_buffer
+      operationId: app.api.buffer.get_settings
       tags:
-        - Settings
+        - Buffer
       responses:
         "200":
           description: The buffer memory settings
@@ -120,9 +180,9 @@ paths:
                 $ref: '#/components/schemas/BufferSettings'
     post:
       description: Configure buffer memory settings
-      operationId: app.api.settings.set_buffer
+      operationId: app.api.buffer.set_settings
       tags:
-        - Settings
+        - Buffer
       requestBody:
         content:
           application/json:
@@ -137,6 +197,8 @@ paths:
             application/json:
               schema:
                   $ref: '#/components/schemas/BufferSettings'
+        "500":
+          $ref: '#/components/responses/500-Execution'
   /buffer/reset:
     post:
       description: Erase all data from buffer memory
@@ -150,6 +212,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Response'
+        "500":
+          $ref: '#/components/responses/500-Execution'
   /buffer/sample:
     get:
       tags:
@@ -173,6 +237,13 @@ servers:
   - url: /api
 
 components:
+  responses:
+    500-Execution:
+      description: Execution error occured
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Response'
   schemas:
     BufferSettings:
       type: object
@@ -198,7 +269,19 @@ components:
         maxLength: 1
         example: [1,2,3,4,5,6,7,8,9,10,0]
       example: [[1,2,3,4,5,6,7,8,9,10,0],[11,12,13,14,15,16,17,18,19,20,1]]
-    LearnWeights:
+    ActorInput:
+      type: array
+      minLength: 1
+      example: [[1,2,3,4],[5,6,7,8],[-1,-2,-3,-4]]
+      items:
+          $ref: '#/components/schemas/State'
+    CriticInput:
+      type: array
+      minLength: 1
+      example: [ [ 1,2,3,4,5 ],[ 5,6,7,8,5],[ -1,-2,-3,-4, -5 ] ]
+      items:
+        $ref: '#/components/schemas/StateAction'
+    ActorWeights:
       type: array
       minLength: 4
       maxLength: 4
@@ -219,11 +302,11 @@ components:
       properties:
         values:
           $ref: '#/components/schemas/MemoryData'
-    LearnResponse:
+    ActorWeightsResponse:
       $ref: '#/components/schemas/Response'
       properties:
         values:
-          $ref: '#/components/schemas/LearnWeights'
+          $ref: '#/components/schemas/ActorWeights'
     AgentSettings:
       type: object
       properties:
@@ -251,6 +334,14 @@ components:
       minLength: 4
       maxLength: 4
       example: [1,2,3,4]
+    StateAction:
+      type: array
+      items:
+        type: number
+        format: double
+      minLength: 5
+      maxLength: 5
+      example: [ 1,2,3,4,5 ]
     Sample:
       type: object
       properties:
