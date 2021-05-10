@@ -35,15 +35,15 @@ def set_settings(body):
 
 
 def get_settings():
-    return load_agent_settings()
+    return get_loaded_agent(False).get_settings()
 
 
-def learn():
+def learn(train_actor=True):
     try:
         buffer_used_size = get_buffer_used_size()
         if buffer_used_size > 0:
             agent = get_loaded_agent()
-            agent.learn(True)
+            agent.learn(train_actor=train_actor)
             agent.save_models()
             return agent.get_actor_weights().tolist()
         return Response("can't learn without experience", status="bad query").__dict__, 400
