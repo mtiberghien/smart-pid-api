@@ -68,7 +68,7 @@ def get_buffer_sample(batch_size):
     where_clause = 'WHERE id IN ({})'.format(",".join([str(num) for num in batch]))
     rng = np.random.default_rng()
     query = 'SELECT error, integral, derivative, saturatedIntegral, n_error, n_integral, n_derivative,  \
-    n_saturatedIntegral, "action", reward, done FROM "Data" {}'.format(where_clause)
+    n_saturatedIntegral, "action", reward FROM "Data" {}'.format(where_clause)
     data = np.array(cursor.execute(query).fetchall())
     rng.shuffle(data)
     con.close()
@@ -77,14 +77,12 @@ def get_buffer_sample(batch_size):
         new_states = data[:, 4:8]
         actions = data[:, 8:9]
         rewards = data[:, 9:10]
-        are_done = data[:, 10:11]
     else:
         states = np.array([])
         actions = np.array([])
         rewards = np.array([])
         new_states = np.array([])
-        are_done = np.array([])
-    return batch_size, states, actions, rewards, new_states, are_done
+    return batch_size, states, actions, rewards, new_states
 
 
 def save_buffer_settings(**kwargs):

@@ -11,9 +11,9 @@ def reset():
 
 
 def get_sample(batch_size=32):
-    used_batch_size, states, actions, rewards, new_states, are_done = get_buffer_sample(batch_size)
+    used_batch_size, states, actions, rewards, new_states = get_buffer_sample(batch_size)
     return {"states": states.tolist(), "actions": actions.tolist(), "rewards": rewards.tolist(),
-            "new_states": new_states.tolist(), "are_done": are_done.tolist()}
+            "new_states": new_states.tolist()}
 
 
 def set_settings(body):

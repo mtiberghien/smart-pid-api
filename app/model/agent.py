@@ -30,8 +30,9 @@ def load_agent_settings():
 
 def save_agent_settings(settings):
     previous_agent = get_loaded_agent(False)
+    previous_settings = previous_agent.get_settings()
     with open(agent_settings_path, mode='w') as file:
-        json.dump(settings, file)
+        json.dump(previous_settings | settings, file)
     new_agent = get_loaded_agent(False)
     if have_agents_structural_differences(previous_agent, new_agent):
         new_agent.save_models()
@@ -41,10 +42,7 @@ class Agent:
     def __init__(self, use_p=True, use_i=True, use_d=True, use_iu=True, n_actions=1, alpha=0.001, beta=0.002,
                  gamma=0.99, tau=0.05, fc1=64, fc2=64, batch_size=256, min_action=0, max_action=100):
         self.n_actions = n_actions
-        self.use_p = use_p
-        self.use_i = use_i
-        self.use_d = use_d
-        self.use_iu = use_iu
+        self.used_states = np.array([use_p, use_i, use_d, use_iu])
         self.alpha = alpha
         self.beta = beta
         self.tau = tau
@@ -76,20 +74,16 @@ class Agent:
 
     def get_n_inputs(self):
         n_inputs = 0
-        if self.use_p:
-            n_inputs += 1
-        if self.use_i:
-            n_inputs += 1
-        if self.use_d:
-            n_inputs += 1
-        if self.use_iu:
-            n_inputs += 1
+        for used_state in self.used_states:
+            if used_state:
+                n_inputs += 1
         return n_inputs
 
     def get_settings(self):
-        return {"use_p": self.use_p, "use_i": self.use_i, "use_d": self.use_d, "use_iu": self.use_iu,
-                "n_actions": self.n_actions, "alpha": self.alpha, "beta": self.beta, "gamma": self.gamma,
-                "tau": self.tau, "fc1": self.fc1, "fc2": self.fc2, "batch_size": self.batch_size,
+        used_states = self.used_states.tolist()
+        return {"use_p": used_states[0], "use_i": used_states[1], "use_d": used_states[2],
+                "use_iu": used_states[3], "n_actions": self.n_actions, "alpha": self.alpha, "beta": self.beta,
+                "gamma": self.gamma, "tau": self.tau, "fc1": self.fc1, "fc2": self.fc2, "batch_size": self.batch_size,
                 "min_action": self.min_action, "max_action": self.max_action}
 
     def update_network_parameters(self, tau_actor=None, tau_critic=None):
@@ -110,6 +104,7 @@ class Agent:
         self.target_critic.set_weights(weights)
 
     def set_actor_weights(self, weights):
+        weights = np.array(weights)[self.used_states].tolist()
         tf_weights = tf.convert_to_tensor([[[w] for w in weights]], dtype=tf.float32)
         self.actor.set_weights(tf_weights)
         self.target_actor.set_weights(tf_weights)
@@ -117,7 +112,16 @@ class Agent:
         self.target_actor.save_model()
 
     def get_actor_weights(self):
-        return tf.squeeze(self.actor.get_weights()).numpy()
+        weights = tf.squeeze(self.actor.get_weights()).numpy().tolist()
+        result = [0, 0, 0, 0]
+        i = 0
+        if np.isscalar(weights):
+            weights = [weights]
+        for index, use_state in enumerate(self.used_states):
+            if use_state:
+                result[index] = weights[i]
+                i += 1
+        return result
 
     def save_models(self):
         self.actor.save_model()
@@ -132,17 +136,17 @@ class Agent:
         self.target_critic.load()
 
     def learn(self, train_actor):
-        used_batch_size, state, action, reward, new_states, done = get_buffer_sample(batch_size=self.batch_size)
-        states = tf.convert_to_tensor(state, dtype=tf.float32)
+        used_batch_size, state, action, reward, new_states = get_buffer_sample(batch_size=self.batch_size)
+        states = tf.convert_to_tensor(state[:, self.used_states], dtype=tf.float32)
         actions = tf.convert_to_tensor(action, dtype=tf.float32)
         rewards = tf.convert_to_tensor(reward, dtype=tf.float32)
-        new_states = tf.convert_to_tensor(new_states, dtype=tf.float32)
+        new_states = tf.convert_to_tensor(new_states[:, self.used_states], dtype=tf.float32)
 
         with tf.GradientTape() as tape:
             target_actions = self.target_actor(new_states, training=True)
             critic_value_ = self.target_critic(tf.concat([new_states, target_actions], axis=1), training=True)
             critic_value = self.critic(tf.concat([states, actions], axis=1), training=True)
-            target = rewards + self.gamma * critic_value_ * (1 - done)
+            target = rewards + self.gamma * critic_value_
             critic_loss = keras.losses.MSE(target, critic_value)
         critic_network_gradient = tape.gradient(critic_loss, self.critic.trainable_variables)
         self.critic.optimizer.apply_gradients(zip(critic_network_gradient,

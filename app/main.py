@@ -5,4 +5,4 @@ settings.init_dirs('')
 app = create_app()
 
 if __name__ == "__main__":
-    app.run(port=1975, debug=True)
+    app.run(port=1968, debug=True)
