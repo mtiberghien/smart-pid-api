@@ -39,7 +39,7 @@ def save_agent_settings(settings):
 
 
 class Agent:
-    def __init__(self, use_p=True, use_i=True, use_d=True, use_iu=True, n_actions=1, alpha=0.001, beta=0.002,
+    def __init__(self, use_p=True, use_i=True, use_d=True, use_iu=True, n_actions=2, alpha=0.001, beta=0.002,
                  gamma=0.99, tau=0.05, fc1=64, fc2=64, batch_size=256, min_action=0, max_action=100):
         self.n_actions = n_actions
         self.used_states = np.array([use_p, use_i, use_d, use_iu])
@@ -136,16 +136,18 @@ class Agent:
         self.target_critic.load()
 
     def learn(self, train_actor):
-        used_batch_size, state, action, reward, new_states = get_buffer_sample(batch_size=self.batch_size)
+        used_batch_size, state, action, reward, new_states, step = get_buffer_sample(batch_size=self.batch_size)
         states = tf.convert_to_tensor(state[:, self.used_states], dtype=tf.float32)
         actions = tf.convert_to_tensor(action, dtype=tf.float32)
         rewards = tf.convert_to_tensor(reward, dtype=tf.float32)
         new_states = tf.convert_to_tensor(new_states[:, self.used_states], dtype=tf.float32)
+        steps = tf.convert_to_tensor(step, dtype=tf.float32)
+        prev_steps = steps - 1
 
         with tf.GradientTape() as tape:
             target_actions = self.target_actor(new_states, training=True)
-            critic_value_ = self.target_critic(tf.concat([new_states, target_actions], axis=1), training=True)
-            critic_value = self.critic(tf.concat([states, actions], axis=1), training=True)
+            critic_value_ = self.target_critic(tf.concat([new_states, target_actions, steps], axis=1), training=True)
+            critic_value = self.critic(tf.concat([states, actions, prev_steps], axis=1), training=True)
             target = rewards + self.gamma * critic_value_
             critic_loss = keras.losses.MSE(target, critic_value)
         critic_network_gradient = tape.gradient(critic_loss, self.critic.trainable_variables)
@@ -154,7 +156,7 @@ class Agent:
         if train_actor:
             with tf.GradientTape() as tape:
                 new_policy_actions = self.actor(states, training=True)
-                actor_loss = -self.critic(tf.concat([states, new_policy_actions], axis=1), training=True)
+                actor_loss = -self.critic(tf.concat([states, new_policy_actions, prev_steps], axis=1), training=True)
                 actor_loss = tf.math.reduce_mean(actor_loss)
 
             actor_network_gradient = tape.gradient(actor_loss, self.actor.trainable_variables)

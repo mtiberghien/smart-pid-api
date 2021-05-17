@@ -23,14 +23,15 @@ class Buffer:
         for d in data:
             if self.settings.mem_index > max_row:
                 query = 'INSERT INTO "Data" (error, integral, derivative, saturatedIntegral, n_error, n_integral, \
-                n_derivative, n_saturatedIntegral, "action", reward, done) VALUES ({});'.format(
+                n_derivative, n_saturatedIntegral, "action", reward, "step") VALUES ({});'.format(
                     ','.join([str(v) for v in d]))
                 max_row += 1
             else:
                 query = 'UPDATE "Data" SET error = {}, integral = {}, derivative = {}, saturatedIntegral = {},\
                         n_error = {}, n_integral = {}, n_derivative = {}, n_saturatedIntegral = {}, "action" = {},' \
-                        ' reward = {}, done = {} WHERE id = {};'.format(d[0], d[1], d[2], d[3], d[4], d[5], d[6], d[7],
-                                                                        d[8], d[9], d[10], self.settings.mem_index)
+                        ' reward = {}, "step" = {} WHERE id = {};'.format(d[0], d[1], d[2], d[3], d[4], d[5], d[6],
+                                                                          d[7], d[8], d[9], d[10],
+                                                                          self.settings.mem_index)
             cursor.execute(query)
             self.settings.mem_index = max(1, (self.settings.mem_index + 1) % (self.settings.mem_size + 1))
         con.commit()
@@ -68,7 +69,7 @@ def get_buffer_sample(batch_size):
     where_clause = 'WHERE id IN ({})'.format(",".join([str(num) for num in batch]))
     rng = np.random.default_rng()
     query = 'SELECT error, integral, derivative, saturatedIntegral, n_error, n_integral, n_derivative,  \
-    n_saturatedIntegral, "action", reward FROM "Data" {}'.format(where_clause)
+    n_saturatedIntegral, "action", reward, "step" FROM "Data" {}'.format(where_clause)
     data = np.array(cursor.execute(query).fetchall())
     rng.shuffle(data)
     con.close()
@@ -77,12 +78,14 @@ def get_buffer_sample(batch_size):
         new_states = data[:, 4:8]
         actions = data[:, 8:9]
         rewards = data[:, 9:10]
+        steps = data[:, 10:11]
     else:
         states = np.array([])
         actions = np.array([])
         rewards = np.array([])
         new_states = np.array([])
-    return batch_size, states, actions, rewards, new_states
+        steps = np.array([])
+    return batch_size, states, actions, rewards, new_states, steps
 
 
 def save_buffer_settings(**kwargs):
