@@ -284,7 +284,7 @@ components:
     CriticInput:
       type: array
       minLength: 1
-      example: [ [ 1,2,3,4,5 ],[ 5,6,7,8,5],[ -1,-2,-3,-4, -5 ] ]
+      example: [ [ 1,2,3,4,5,1 ],[ 5,6,7,8,5,2],[ -1,-2,-3,-4, -5,3 ] ]
       items:
         $ref: '#/components/schemas/StateAction'
     ActorWeights:
@@ -396,9 +396,9 @@ components:
       items:
         type: number
         format: double
-      minLength: 5
-      maxLength: 5
-      example: [ 1,2,3,4,5 ]
+      minLength: 6
+      maxLength: 6
+      example: [ 1,2,3,4,5,6 ]
     Sample:
       type: object
       properties:

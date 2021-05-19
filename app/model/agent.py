@@ -1,5 +1,4 @@
-from app.model.actor import ActorNetwork
-from app.model.critic import CriticNetwork
+import os
 from tensorflow.keras.optimizers import Adam
 import tensorflow as tf
 import numpy as np
@@ -16,7 +15,7 @@ def get_loaded_agent(load_models=True):
     settings = load_agent_settings()
     agent = Agent(**settings)
     if load_models:
-        agent.load_models()
+        agent.build_models()
     return agent
 
 
@@ -35,7 +34,12 @@ def save_agent_settings(settings):
         json.dump(previous_settings | settings, file)
     new_agent = get_loaded_agent(False)
     if have_agents_structural_differences(previous_agent, new_agent):
-        new_agent.save_models()
+        new_agent.reset_models()
+
+
+def delete_file_if_exists(checkpoint_file):
+    if path.exists(checkpoint_file):
+        os.remove(checkpoint_file)
 
 
 class Agent:
@@ -53,24 +57,15 @@ class Agent:
         self.max_action = max_action
         self.fc1 = fc1
         self.fc2 = fc2
-        n_inputs = self.get_n_inputs()
-        self.actor = ActorNetwork((n_inputs,), self.min_action, self.max_action, name='actor_pid')
-        self.critic = CriticNetwork((n_inputs + self.n_actions,), name='critic_pid',
-                                    fc1_dims=self.fc1, fc2_dims=self.fc2)
-        self.target_actor = ActorNetwork(n_inputs, self.min_action, self.max_action, name='target_actor_pid')
-        self.target_critic = CriticNetwork(n_inputs + self.n_actions, name='target_critic_pid', fc1_dims=self.fc1,
-                                           fc2_dims=self.fc2)
-
-        self.actor.compile(optimizer=Adam(learning_rate=self.alpha))
-        self.critic.compile(optimizer=Adam(learning_rate=self.beta))
-        self.target_actor.compile(optimizer=Adam(learning_rate=self.alpha))
-        self.target_critic.compile(optimizer=Adam(learning_rate=self.beta))
-        self.update_network_parameters(tau_actor=1, tau_critic=1)
-
-        self.actor(tf.convert_to_tensor([np.zeros(n_inputs)]))
-        self.target_actor(tf.convert_to_tensor([np.zeros(n_inputs)]))
-        self.critic(tf.convert_to_tensor([np.zeros(n_inputs + self.n_actions)]))
-        self.target_critic(tf.convert_to_tensor([np.zeros(n_inputs + self.n_actions)]))
+        self.n_inputs = self.get_n_inputs()
+        self.actor_checkpoint_file = path.join(data_dir, 'actor_pid.h5')
+        self.target_actor_checkpoint_file = path.join(data_dir, 'target_actor_pid.h5')
+        self.critic_checkpoint_file = path.join(data_dir, 'critic_pid.h5')
+        self.target_critic_checkpoint_file = path.join(data_dir, 'target_critic_pid.h5')
+        self.actor = None
+        self.critic = None
+        self.target_actor = None
+        self.target_critic = None
 
     def get_n_inputs(self):
         n_inputs = 0
@@ -108,8 +103,8 @@ class Agent:
         tf_weights = tf.convert_to_tensor([[[w] for w in weights]], dtype=tf.float32)
         self.actor.set_weights(tf_weights)
         self.target_actor.set_weights(tf_weights)
-        self.actor.save_model()
-        self.target_actor.save_model()
+        self.actor.save(self.actor_checkpoint_file)
+        self.target_actor.save_weights(self.target_actor_checkpoint_file)
 
     def get_actor_weights(self):
         weights = tf.squeeze(self.actor.get_weights()).numpy().tolist()
@@ -123,17 +118,69 @@ class Agent:
                 i += 1
         return result
 
-    def save_models(self):
-        self.actor.save_model()
-        self.critic.save_model()
-        self.target_actor.save_model()
-        self.target_critic.save_model()
+    def save_models(self, train_actor=True):
+        if train_actor:
+            self.actor.save(self.actor_checkpoint_file)
+        self.critic.save(self.critic_checkpoint_file)
+        self.target_actor.save_weights(self.target_actor_checkpoint_file)
+        self.target_critic.save_weights(self.target_critic_checkpoint_file)
 
-    def load_models(self):
-        self.actor.load()
-        self.critic.load()
-        self.target_actor.load()
-        self.target_critic.load()
+    def build_actor(self):
+        actor = tf.keras.Sequential([
+            tf.keras.layers.Input(shape=(self.n_inputs,)),
+            tf.keras.layers.Dense(1, use_bias=False, kernel_initializer=tf.keras.initializers.Ones())
+        ])
+        actor.compile(optimizer=Adam(learning_rate=self.alpha))
+        actor(tf.convert_to_tensor([np.zeros(self.n_inputs)]))
+        return actor
+
+    def build_critic(self):
+        critic = tf.keras.Sequential([
+            tf.keras.layers.Input(shape=(self.n_inputs + self.n_actions,)),
+            tf.keras.layers.Dense(self.fc1, activation='relu'),
+            tf.keras.layers.Dense(self.fc2, activation='relu'),
+            tf.keras.layers.Dense(1)
+        ])
+        critic.compile(optimizer=Adam(learning_rate=self.beta))
+        return critic
+
+    def load_model(self, checkpoint_file, is_target, is_actor):
+        exists = path.exists(checkpoint_file)
+        if not exists or is_target:
+            if is_actor:
+                model = self.build_actor()
+            else:
+                model = self.build_critic()
+        else:
+            model = tf.keras.models.load_model(checkpoint_file)
+        if exists and is_target:
+            model.load_weights(checkpoint_file)
+
+        return model
+
+    def reset_models(self):
+        self.actor = self.build_actor()
+        self.target_actor = self.build_actor()
+        self.critic = self.build_critic()
+        self.target_critic = self.build_critic()
+        self.save_models()
+
+    def build_models(self):
+        need_update_network = not path.exists(self.target_actor_checkpoint_file)
+
+        self.actor = self.load_model(self.actor_checkpoint_file, False, True)
+        self.target_actor = self.load_model(self.target_actor_checkpoint_file, True, True)
+        self.critic = self.load_model(self.critic_checkpoint_file, False, False)
+        self.target_critic = self.load_model(self.target_critic_checkpoint_file, True, False)
+
+        if need_update_network:
+            self.update_network_parameters(tau_actor=1, tau_critic=1)
+
+    def get_actor_saturated(self, states, actor: tf.keras.Model, training=True):
+        relu = tf.keras.layers.ReLU()
+        output = actor(states, training=training)
+        output = relu(-relu(self.max_action - output) + self.max_action - self.min_action) + self.min_action
+        return output
 
     def learn(self, train_actor):
         used_batch_size, state, action, reward, new_states, step = get_buffer_sample(batch_size=self.batch_size)
@@ -145,7 +192,7 @@ class Agent:
         prev_steps = steps - 1
 
         with tf.GradientTape() as tape:
-            target_actions = self.target_actor(new_states, training=True)
+            target_actions = self.get_actor_saturated(new_states, self.target_actor, training=True)
             critic_value_ = self.target_critic(tf.concat([new_states, target_actions, steps], axis=1), training=True)
             critic_value = self.critic(tf.concat([states, actions, prev_steps], axis=1), training=True)
             target = rewards + self.gamma * critic_value_
@@ -155,7 +202,7 @@ class Agent:
                                                   self.critic.trainable_variables))
         if train_actor:
             with tf.GradientTape() as tape:
-                new_policy_actions = self.actor(states, training=True)
+                new_policy_actions = self.get_actor_saturated(states, self.actor, training=True)
                 actor_loss = -self.critic(tf.concat([states, new_policy_actions, prev_steps], axis=1), training=True)
                 actor_loss = tf.math.reduce_mean(actor_loss)
 
@@ -170,4 +217,4 @@ class Agent:
 
 def have_agents_structural_differences(agent_1: Agent, agent_2: Agent):
     return agent_1.fc1 != agent_2.fc1 or agent_1.fc2 != agent_2.fc2 or \
-           agent_1.get_n_inputs() != agent_2.get_n_inputs() or agent_1.n_actions != agent_2.n_actions
+           agent_1.n_inputs != agent_2.n_inputs or agent_1.n_actions != agent_2.n_actions

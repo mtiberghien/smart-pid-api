@@ -47,7 +47,7 @@ def learn(train_actor=True):
         if buffer_used_size > 0:
             agent = get_loaded_agent()
             agent.learn(train_actor=train_actor)
-            agent.save_models()
+            agent.save_models(train_actor)
             return agent.get_actor_weights()
         return Response("can't learn without experience", status="bad query").__dict__, 400
     except Exception as e:
@@ -59,7 +59,7 @@ def test_actor(body):
         agent = get_loaded_agent()
         data = np.array(body)
         state = tf.convert_to_tensor(data[:, agent.used_states], dtype=tf.float32)
-        return agent.actor(state, training=False).numpy().tolist()
+        return agent.get_actor_saturated(state, agent.actor, False).numpy().tolist()
     except Exception as e:
         return ExceptionResponse(e).__dict__, 500
 
@@ -68,7 +68,7 @@ def test_critic(body):
     try:
         agent = get_loaded_agent()
         data = np.array(body)
-        state_action = tf.convert_to_tensor(data[:, np.concatenate((agent.used_states, [True]))], dtype=tf.float32)
+        state_action = tf.convert_to_tensor(data[:, np.concatenate((agent.used_states, [True, True]))], dtype=tf.float32)
         return agent.critic(state_action, training=False).numpy().tolist()
     except Exception as e:
         return ExceptionResponse(e).__dict__, 500
