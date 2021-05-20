@@ -75,7 +75,7 @@ class Agent:
         return n_inputs
 
     def get_settings(self):
-        used_states = self.used_states.tolist()
+        used_states = [bool(s) for s in iter(self.used_states)]
         return {"use_p": used_states[0], "use_i": used_states[1], "use_d": used_states[2],
                 "use_iu": used_states[3], "n_actions": self.n_actions, "alpha": self.alpha, "beta": self.beta,
                 "gamma": self.gamma, "tau": self.tau, "fc1": self.fc1, "fc2": self.fc2, "batch_size": self.batch_size,
@@ -106,8 +106,9 @@ class Agent:
         self.actor.save(self.actor_checkpoint_file)
         self.target_actor.save_weights(self.target_actor_checkpoint_file)
 
-    def get_actor_weights(self):
-        weights = tf.squeeze(self.actor.get_weights()).numpy().tolist()
+    def get_actor_weights(self, is_target=False):
+        weights = (self.target_actor if is_target else self.actor).get_weights()
+        weights = tf.squeeze(weights).numpy().tolist()
         result = [0, 0, 0, 0]
         i = 0
         if np.isscalar(weights):
@@ -127,7 +128,7 @@ class Agent:
 
     def build_actor(self):
         actor = tf.keras.Sequential([
-            tf.keras.layers.Input(shape=(self.n_inputs,)),
+            tf.keras.layers.InputLayer(input_shape=(self.n_inputs,)),
             tf.keras.layers.Dense(1, use_bias=False, kernel_initializer=tf.keras.initializers.Ones())
         ])
         actor.compile(optimizer=Adam(learning_rate=self.alpha))
@@ -136,7 +137,7 @@ class Agent:
 
     def build_critic(self):
         critic = tf.keras.Sequential([
-            tf.keras.layers.Input(shape=(self.n_inputs + self.n_actions,)),
+            tf.keras.layers.InputLayer(input_shape=(self.n_inputs + self.n_actions,)),
             tf.keras.layers.Dense(self.fc1, activation='relu'),
             tf.keras.layers.Dense(self.fc2, activation='relu'),
             tf.keras.layers.Dense(1)
@@ -211,7 +212,7 @@ class Agent:
                                         name="training actor")
             self.actor.optimizer.apply_gradients(zip(actor_network_gradient, self.actor.trainable_variables))
 
-        self.update_network_parameters(tau_actor=(1 if train_actor else None))
+        self.update_network_parameters(tau_actor=(None if train_actor else 0))
         return used_batch_size
 
 

@@ -26,7 +26,7 @@ def set_weights(body):
 
 def get_weights():
     agent = get_loaded_agent()
-    return agent.get_actor_weights()
+    return {"actor": agent.get_actor_weights(False), "target_actor": agent.get_actor_weights(True)}
 
 
 def set_settings(body):
@@ -38,7 +38,8 @@ def set_settings(body):
 
 
 def get_settings():
-    return get_loaded_agent(False).get_settings()
+    settings = get_loaded_agent(False).get_settings()
+    return settings
 
 
 def learn(train_actor=True):
