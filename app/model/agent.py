@@ -42,8 +42,14 @@ def delete_file_if_exists(checkpoint_file):
         os.remove(checkpoint_file)
 
 
+def get_normalized_tensor(tensor):
+    result = tensor - tensor.mean(axis=0)
+    result /= result.std(axis=0)
+    return tf.cast(tf.where(tf.math.is_nan(result), tf.zeros_like(result), result), dtype=tf.float32)
+
+
 class Agent:
-    def __init__(self, use_p=True, use_i=True, use_d=True, use_iu=True, n_actions=2, alpha=0.001, beta=0.002,
+    def __init__(self, use_p=True, use_i=True, use_d=True, use_iu=True, n_actions=2, alpha=0.001, beta=0.001,
                  gamma=0.99, tau=0.05, fc1=64, fc2=64, batch_size=256, min_action=0, max_action=100):
         self.n_actions = n_actions
         self.used_states = np.array([use_p, use_i, use_d, use_iu])
@@ -184,13 +190,13 @@ class Agent:
         return output
 
     def learn(self, train_actor):
-        used_batch_size, state, action, reward, new_states, step = get_buffer_sample(batch_size=self.batch_size)
-        states = tf.convert_to_tensor(state[:, self.used_states], dtype=tf.float32)
-        actions = tf.convert_to_tensor(action, dtype=tf.float32)
+        used_batch_size, state, action, reward, new_state, step = get_buffer_sample(batch_size=self.batch_size)
+        states = get_normalized_tensor(state[:, self.used_states])
+        actions = self.get_actor_saturated(states, self.actor, training=False)
         rewards = tf.convert_to_tensor(reward, dtype=tf.float32)
-        new_states = tf.convert_to_tensor(new_states[:, self.used_states], dtype=tf.float32)
-        steps = tf.convert_to_tensor(step, dtype=tf.float32)
-        prev_steps = steps - 1
+        new_states = get_normalized_tensor(new_state[:, self.used_states])
+        steps = get_normalized_tensor(step)
+        prev_steps = get_normalized_tensor(step-1)
 
         with tf.GradientTape() as tape:
             target_actions = self.get_actor_saturated(new_states, self.target_actor, training=True)

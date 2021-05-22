@@ -341,7 +341,7 @@ components:
           description: target learning rate
           type: number
           format: double
-          example: 0.002
+          example: 0.001
         gamma:
           description: critic learning discount rate
           type: number
