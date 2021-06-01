@@ -197,9 +197,8 @@ class Agent:
             self.update_network_parameters(tau_actor=1, tau_critic=1)
 
     def get_actor_saturated(self, states, actor: tf.keras.Model, training=True):
-        relu = tf.keras.layers.ReLU()
         output = actor(states, training=training)
-        output = relu(-relu(self.max_action - output) + self.max_action - self.min_action) + self.min_action
+        output = (tf.keras.activations.sigmoid(output)*(self.max_action - self.min_action)) + self.min_action
         return output
 
     @tf.function

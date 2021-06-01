@@ -1,4 +1,4 @@
-from os import path, getcwd
+from os import path
 from app.model.settings import data_dir
 import sqlite3
 import numpy as np
@@ -56,8 +56,9 @@ def get_buffer_max_row(cursor):
 def get_buffer_used_size():
     con = sqlite3.connect(buffer_db_path)
     cursor = con.cursor()
-    return get_buffer_max_row(cursor)
+    result = get_buffer_max_row(cursor)
     con.close()
+    return result
 
 
 def get_buffer_sample(batch_size):
