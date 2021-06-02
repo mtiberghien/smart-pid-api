@@ -1,8 +1,6 @@
-import numpy
-
 from app.model.buffer import Buffer, get_buffer_used_size
 from app.model.response import ValuedResponse, Response, ExceptionResponse
-from app.model.agent import Agent, load_agent_settings, save_agent_settings, get_loaded_agent
+from app.model.agent import load_agent_settings, save_agent_settings, get_loaded_agent
 import tensorflow as tf
 import numpy as np
 
@@ -60,7 +58,7 @@ def test_actor(body):
         agent = get_loaded_agent()
         data = np.array(body)
         state = tf.convert_to_tensor(data[:, agent.used_states], dtype=tf.float32)
-        return agent.get_actor_saturated(state, agent.actor, False).numpy().tolist()
+        return agent.actor(state, False).numpy().tolist()
     except Exception as e:
         return ExceptionResponse(e).__dict__, 500
 
@@ -69,7 +67,9 @@ def test_critic(body):
     try:
         agent = get_loaded_agent()
         data = np.array(body)
-        state_action = tf.convert_to_tensor(data[:, np.concatenate((agent.used_states, [True, True]))], dtype=tf.float32)
-        return agent.critic(state_action, training=False).numpy().tolist()
+        states = data[:, np.concatenate((agent.used_states, [False, False]))]
+        actions = data[:, -2:-1]
+        steps = data[:, -1:]
+        return agent.critic(states, actions, steps, training=False).numpy().tolist()
     except Exception as e:
         return ExceptionResponse(e).__dict__, 500

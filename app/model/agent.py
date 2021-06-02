@@ -6,7 +6,8 @@ from app.model.buffer import get_buffer_sample
 from app.model.settings import data_dir
 from os import path
 import json
-import pickle
+from app.model.actor import ActorNetwork
+from app.model.critic import CriticNetwork
 
 
 agent_settings_path = path.join(data_dir, 'agent.json')
@@ -35,7 +36,7 @@ def save_agent_settings(settings):
         json.dump(previous_settings | settings, file)
     new_agent = get_loaded_agent(False)
     if have_agents_structural_differences(previous_agent, new_agent):
-        new_agent.reset_models()
+        new_agent.save_models()
 
 
 def delete_file_if_exists(checkpoint_file):
@@ -71,18 +72,15 @@ class Agent:
         self.fc1 = fc1
         self.fc2 = fc2
         self.n_inputs = self.get_n_inputs()
-        self.actor_checkpoint_file = path.join(data_dir, 'actor_pid.h5')
-        self.target_actor_checkpoint_file = path.join(data_dir, 'target_actor_pid.h5')
-        self.critic_checkpoint_file = path.join(data_dir, 'critic_pid.h5')
-        self.target_critic_checkpoint_file = path.join(data_dir, 'target_critic_pid.h5')
-        self.actor_optimizer_file = path.join(data_dir, 'actor_optimizer.pkl')
-        self.critic_optimizer_file = path.join(data_dir, 'critic_optimizer.pkl')
         self.actor_optimizer = Adam(learning_rate=self.alpha)
         self.critic_optimizer = Adam(learning_rate=self.beta)
-        self.actor = self.build_actor()
-        self.critic = self.build_critic()
-        self.target_actor = self.build_actor()
-        self.target_critic = self.build_critic()
+        self.actor = ActorNetwork(self.n_inputs, name='actor',
+                                  min_action=self.min_action, max_action=self.max_action)
+        self.critic = CriticNetwork(self.n_inputs + self.n_actions, fc1_dims=self.fc1, fc2_dims=self.fc2, name='critic')
+        self.target_actor = ActorNetwork(self.n_inputs,  name='target_actor', min_action=self.min_action,
+                                         max_action=self.max_action)
+        self.target_critic = CriticNetwork(self.n_inputs + self.n_actions, fc1_dims=self.fc1, fc2_dims=self.fc2,
+                                           name='target_critic')
 
     def get_n_inputs(self):
         n_inputs = 0
@@ -103,19 +101,19 @@ class Agent:
             tau_actor = self.tau
         if tau_critic is None:
             tau_critic = self.tau
-        update_target(self.target_actor.variables, self.actor.variables, tau_actor)
-        update_target(self.target_critic.variables, self.critic.variables, tau_critic)
+        update_target(self.target_actor.model.variables, self.actor.model.variables, tau_actor)
+        update_target(self.target_critic.model.variables, self.critic.model.variables, tau_critic)
 
     def set_actor_weights(self, weights):
         weights = np.array(weights)[self.used_states].tolist()
         tf_weights = tf.convert_to_tensor([[[w] for w in weights]], dtype=tf.float32)
-        self.actor.set_weights(tf_weights)
-        self.target_actor.set_weights(tf_weights)
-        self.actor.save_weights(self.actor_checkpoint_file)
-        self.target_actor.save_weights(self.target_actor_checkpoint_file)
+        self.actor.model.set_weights(tf_weights)
+        self.target_actor.model.set_weights(tf_weights)
+        self.actor.save()
+        self.target_actor.save()
 
     def get_actor_weights(self, is_target=False):
-        weights = (self.target_actor if is_target else self.actor).get_weights()
+        weights = (self.target_actor if is_target else self.actor).model.get_weights()
         weights = tf.squeeze(weights).numpy().tolist()
         result = [0, 0, 0, 0]
         i = 0
@@ -127,71 +125,21 @@ class Agent:
                 i += 1
         return result
 
-    def save_optimizer(self, is_actor=True):
-        file_path = self.actor_optimizer_file if is_actor else self.critic_optimizer_file
-        optimizer = self.actor_optimizer if is_actor else self.critic_optimizer
-        weights_values = tf.keras.backend.batch_get_value(optimizer.weights)
-        with open(file_path, 'wb') as f:
-            pickle.dump(weights_values, f)
-
-    def load_optimizer(self, is_actor=True):
-        file_path = self.actor_optimizer_file if is_actor else self.critic_optimizer_file
-        if path.exists(file_path):
-            optimizer = self.actor_optimizer if is_actor else self.critic_optimizer
-            with open(file_path, 'rb') as f:
-                weight_values = pickle.load(f)
-            optimizer.set_weights(weight_values)
-
-    def save_models(self, train_actor=True):
-        if train_actor:
-            self.actor.save_weights(self.actor_checkpoint_file)
-            self.save_optimizer(True)
-        self.critic.save_weights(self.critic_checkpoint_file)
-        self.target_actor.save_weights(self.target_actor_checkpoint_file)
-        self.target_critic.save_weights(self.target_critic_checkpoint_file)
-        self.save_optimizer(False)
-
-    def build_actor(self):
-        actor = tf.keras.Sequential([
-            tf.keras.layers.InputLayer(input_shape=(self.n_inputs,)),
-            tf.keras.layers.Dense(1, use_bias=False, kernel_initializer=tf.keras.initializers.Ones())
-        ])
-        return actor
-
-    def build_critic(self):
-        critic = tf.keras.Sequential([
-            tf.keras.layers.InputLayer(input_shape=(self.n_inputs + self.n_actions,)),
-            tf.keras.layers.Dense(self.fc1, activation='relu'),
-            tf.keras.layers.Dense(self.fc2, activation='relu'),
-            tf.keras.layers.Dense(1)
-        ])
-        return critic
-
-    def load_model(self, checkpoint_file, is_target, is_actor):
-        exists = path.exists(checkpoint_file)
-        if is_actor:
-            model = self.target_actor if is_target else self.actor
-        else:
-            model = self.target_critic if is_target else self.critic
-        if exists:
-            model.load_weights(checkpoint_file)
-
-    def reset_models(self):
-        self.actor = self.build_actor()
-        self.target_actor = self.build_actor()
-        self.critic = self.build_critic()
-        self.target_critic = self.build_critic()
-        self.save_models()
+    def save_models(self, save_actor=True):
+        if save_actor:
+            self.actor.save()
+        self.critic.save()
+        self.target_actor.save()
+        self.target_critic.save()
 
     def build_models(self):
-        need_update_network = not path.exists(self.target_actor_checkpoint_file)
-
-        self.load_model(self.actor_checkpoint_file, False, True)
-        self.load_model(self.target_actor_checkpoint_file, True, True)
-        self.load_model(self.critic_checkpoint_file, False, False)
-        self.load_model(self.target_critic_checkpoint_file, True, False)
-        self.load_optimizer(True)
-        self.load_optimizer(False)
+        need_update_network = not path.exists(self.target_actor.checkpoint_file)
+        self.actor.model.compile(self.actor_optimizer)
+        self.critic.model.compile(self.critic_optimizer)
+        self.actor.load()
+        self.critic.load()
+        self.target_actor.load()
+        self.target_critic.load()
 
         if need_update_network:
             self.update_network_parameters(tau_actor=1, tau_critic=1)
@@ -204,29 +152,29 @@ class Agent:
     @tf.function
     def train(self, states, new_states, actions, rewards, steps, prev_steps, train_actor):
         with tf.GradientTape() as tape:
-            target_actions = self.get_actor_saturated(new_states, self.target_actor, training=True)
-            critic_value_ = self.target_critic(tf.concat([new_states, target_actions, steps], axis=1), training=True)
-            critic_value = self.critic(tf.concat([states, actions, prev_steps], axis=1), training=True)
+            target_actions = self.target_actor(new_states, training=True)
+            critic_value_ = self.target_critic(new_states, target_actions, steps, training=True)
+            critic_value = self.critic(states, actions, prev_steps, training=True)
             target = rewards + self.gamma * critic_value_
             critic_loss = tf.math.reduce_mean(tf.math.square(target - critic_value))
-        critic_network_gradient = tape.gradient(critic_loss, self.critic.trainable_variables)
+        critic_network_gradient = tape.gradient(critic_loss, self.critic.model.trainable_variables)
         self.critic_optimizer.apply_gradients(zip(critic_network_gradient,
-                                                  self.critic.trainable_variables))
+                                                  self.critic.model.trainable_variables))
         if train_actor:
             with tf.GradientTape() as tape:
-                new_policy_actions = self.get_actor_saturated(states, self.actor, training=True)
-                actor_loss = -self.critic(tf.concat([states, new_policy_actions, prev_steps], axis=1), training=True)
-                actor_loss = tf.math.reduce_mean(actor_loss)
+                new_policy_actions = self.actor(states, training=True)
+                actor_loss = self.critic(states, new_policy_actions, prev_steps, training=True)
+                actor_loss = -tf.math.reduce_mean(actor_loss)
 
-            actor_network_gradient = tape.gradient(actor_loss, self.actor.trainable_variables)
+            actor_network_gradient = tape.gradient(actor_loss, self.actor.model.trainable_variables)
             tf.debugging.check_numerics(actor_network_gradient, message="actor_loss:{}".format(actor_loss),
                                         name="training actor")
-            self.actor_optimizer.apply_gradients(zip(actor_network_gradient, self.actor.trainable_variables))
+            self.actor_optimizer.apply_gradients(zip(actor_network_gradient, self.actor.model.trainable_variables))
 
     def learn(self, train_actor):
         used_batch_size, state, action, reward, new_state, step = get_buffer_sample(batch_size=self.batch_size)
         states = get_normalized_tensor(state[:, self.used_states])
-        actions = self.get_actor_saturated(states, self.actor, training=False)
+        actions = self.actor(states, training=False)
         rewards = tf.convert_to_tensor(reward, dtype=tf.float32)
         new_states = get_normalized_tensor(new_state[:, self.used_states])
         steps = get_normalized_tensor(step)
