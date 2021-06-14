@@ -14,13 +14,13 @@ class CriticNetwork:
         self.checkpoint_file = os.path.join(data_dir, self.model_name + '.h5')
         self.model = tf.keras.Sequential([
             tf.keras.layers.InputLayer(input_shape=(self.n_inputs,)),
-            tf.keras.layers.Dense(self.fc1, activation='relu'),
-            tf.keras.layers.Dense(self.fc2, activation='relu'),
+            tf.keras.layers.Dense(self.fc1_dims, activation='relu'),
+            tf.keras.layers.Dense(self.fc2_dims, activation='relu'),
             tf.keras.layers.Dense(1)
         ])
 
-    def __call__(self, batch_state, batch_action, batch_step, training=True):
-        q = self.model(tf.concat([batch_state, batch_action, batch_step], axis=1), training=training)
+    def __call__(self, batch_state, batch_action, training=True):
+        q = self.model(tf.concat([batch_state, batch_action], axis=1), training=training)
         return q
 
     def save(self):

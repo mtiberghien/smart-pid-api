@@ -23,13 +23,17 @@ class ActorNetwork:
 
     def save(self):
         if self.model.optimizer is not None:
+            print('saving model:{}'.format(self.checkpoint_file))
             self.model.save(self.checkpoint_file)
         else:
+            print('saving weights:{}'.format(self.checkpoint_file))
             self.model.save_weights(self.checkpoint_file)
 
     def load(self):
         if os.path.exists(self.checkpoint_file):
             if self.model.optimizer is not None:
+                print('loading model:{}'.format(self.checkpoint_file))
                 self.model = tf.keras.models.load_model(self.checkpoint_file)
             else:
+                print('loading weights:{}'.format(self.checkpoint_file))
                 self.model.load_weights(self.checkpoint_file)
