@@ -8,6 +8,11 @@ buffer_db_path = path.join(root_dir, data_dir, db_file)
 settings_file_path = path.join(root_dir, data_dir, settings_file)
 
 
+def get_data_dir():
+    global root_dir, data_dir
+    return path.join(root_dir, data_dir)
+
+
 def get_buffer_db_path():
     global buffer_db_path
     return buffer_db_path

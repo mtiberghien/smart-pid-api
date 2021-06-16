@@ -117,8 +117,12 @@ class Agent:
             self.batch_size = settings["batch_size"]
         if "min_action" in settings:
             self.min_action = settings["min_action"]
+            self.actor.min_action = self.min_action
+            self.target_actor.min_action = self.min_action
         if "max_action" in settings:
             self.max_action = settings["max_action"]
+            self.actor.max_action = self.max_action
+            self.target_actor.max_action = self.max_action
 
     def update_network_parameters(self, tau_actor=None, tau_critic=None):
         if tau_actor is None:

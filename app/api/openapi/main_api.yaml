@@ -171,6 +171,26 @@ paths:
                     format: double
         "500":
           $ref: '#/components/responses/500-Execution'
+  /agent/save:
+    post:
+      description: save agent networks
+      operationId: app.api.agent.save
+      tags:
+        - Agent
+      parameters:
+        - in: query
+          name: critic_only
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: The neural networks are successfully saved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Response'
+        "500":
+          $ref: '#/components/responses/500-Execution'
   /buffer/settings:
     get:
       description: buffer memory settings
@@ -249,7 +269,7 @@ components:
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/Response'
+            $ref: '#/components/schemas/ExceptionResponse'
   schemas:
     BufferSettings:
       type: object
@@ -302,6 +322,11 @@ components:
           type: string
           example: ok
         message:
+          type: string
+    ExceptionResponse:
+      $ref: '#/components/schemas/Response'
+      properties:
+        trace:
           type: string
     MemoryStorageResponse:
       $ref: '#/components/schemas/Response'
