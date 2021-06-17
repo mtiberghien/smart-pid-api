@@ -44,7 +44,6 @@ def delete_file_if_exists(checkpoint_file):
         os.remove(checkpoint_file)
 
 
-@tf.function
 def update_target(target_weights, weights, tau):
     for (a, b) in zip(target_weights, weights):
         a.assign(b * tau + a * (1 - tau))
@@ -170,7 +169,6 @@ class Agent:
         if need_update_network:
             self.update_network_parameters(tau_actor=1, tau_critic=1)
 
-    @tf.function
     def train(self, states, new_states, actions, rewards, train_actor):
         with tf.GradientTape() as tape:
             target_actions = self.target_actor(new_states, training=True)

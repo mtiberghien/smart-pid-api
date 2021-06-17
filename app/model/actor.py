@@ -14,5 +14,6 @@ class ActorNetwork(Network):
 
     def __call__(self, state, training=True):
         mu = self.model(state, training=training)
-        sat_mu = tf.clip_by_value(mu, self.min_action, self.max_action)
+        sat_mu = tf.keras.activations.relu(-tf.keras.activations.relu(self.max_action - mu) + self.max_action
+                                           - self.min_action) + self.min_action
         return sat_mu
