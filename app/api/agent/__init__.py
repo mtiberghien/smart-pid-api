@@ -47,10 +47,10 @@ def get_settings():
     return settings
 
 
-def save(critic_only=False):
+def save(is_best_actor=False):
     global agent
     try:
-        agent.save_models(critic_only)
+        agent.save_models(is_best_actor)
         return Response("Successfully saved models").__dict__
     except Exception as e:
         return ExceptionResponse(e).__dict__, 500

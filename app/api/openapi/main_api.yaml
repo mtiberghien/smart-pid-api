@@ -179,7 +179,7 @@ paths:
         - Agent
       parameters:
         - in: query
-          name: critic_only
+          name: is_best_actor
           schema:
             type: boolean
       responses:

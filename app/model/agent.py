@@ -152,10 +152,9 @@ class Agent:
                 i += 1
         return result
 
-    def save_models(self, critic_only=False):
-        if not critic_only:
-            self.actor.save()
-            self.target_actor.save()
+    def save_models(self, is_best_actor=False):
+        self.actor.save(is_best_actor)
+        self.target_actor.save()
         self.critic.save()
         self.target_critic.save()
 
