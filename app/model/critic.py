@@ -3,7 +3,7 @@ from app.model.network import Network
 
 
 class CriticNetwork(Network):
-    def __init__(self, n_inputs=4, fc1_dims=512, fc2_dims=512,
+    def __init__(self, n_inputs=5, fc1_dims=512, fc2_dims=512,
                  name='critic'):
         super().__init__(name)
         self.fc1_dims = fc1_dims
