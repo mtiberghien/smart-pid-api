@@ -3,7 +3,7 @@ from app.model.network import Network
 
 
 class ActorNetwork(Network):
-    def __init__(self, n_inputs=3, name='actor', min_action=0, max_action=1):
+    def __init__(self, n_inputs=4, name='actor', min_action=0, max_action=1):
         super().__init__(name)
         self.min_action = min_action
         self.max_action = max_action
